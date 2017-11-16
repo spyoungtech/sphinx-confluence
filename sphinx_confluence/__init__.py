@@ -320,8 +320,8 @@ class HTMLConfluenceTranslator(HTMLTranslator):
         self.section_level -= 1
 
     def visit_reference(self, node):
-        from pprint import pprint
-        pprint(vars(node))
+        # from pprint import pprint
+        # pprint(vars(node))
         atts = {'class': 'reference'}
         if node.get('internal') or 'refuri' not in node:
             atts['class'] += ' internal'
