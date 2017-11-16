@@ -123,15 +123,17 @@ def doctree_read(app, doctree):
                 # only one link per name, please
                 continue
             names.add(fullname)
-            print(fullname)
+            # print(fullname)
             # pagename = '_modules/' + modname.replace('.', '/')
-            pagename = 'https://scm.biotech.ufl.edu/projects/ISS/repos/selfservice/browse/' + modname.replace('.', '/') + ".py#{}".format(line_no)
+            base_url = app.config.sphinx_confluence_repo_path
+            # print('base url: ', base_url)
+            pagename = base_url + modname.replace('.', '/') + ".py#{}".format(line_no)
             onlynode = addnodes.only(expr='html')
             def pending_xref(*args, **kwargs):
                 # print('xref args', kwargs)
 
                 result = addnodes.pending_xref(*args, **kwargs)
-                print('xref-result:', result)
+                # print('xref-result:', result)
                 return result
 
             onlynode += pending_xref(
@@ -272,6 +274,7 @@ def setup(app):
     # type: (Sphinx) -> Dict[unicode, Any]
     app.add_config_value('viewcode_import', True, False)
     app.add_config_value('viewcode_enable_epub', False, False)
+    app.add_config_value('sphinx_confluence_repo_path', '_modules/', False)
     app.connect('doctree-read', doctree_read)
     app.connect('env-merge-info', env_merge_info)
     app.connect('html-collect-pages', collect_pages)
