@@ -355,34 +355,6 @@ class HTMLConfluenceTranslator(HTMLTranslator):
         if node.get('secnumber'):
             self.body.append(('%s' + self.secnumber_suffix) % '.'.join(map(str, node['secnumber'])))
 
-    def visit_desc(self, node):
-        """ Replace <dl> """
-        self.body.append(self.starttag(node, 'div', style="margin-top: 10px"))
-
-    def depart_desc(self, node):
-        self.body.append('</div>\n\n')
-
-    def visit_desc_signature(self, node):
-        """ Replace <dt> """
-        # the id is set automatically
-        self.body.append(self.starttag(
-            node, 'div', style='margin-left: 20px; font-weight: bold;'))
-        # anchor for per-desc interactive data
-        if node.parent['objtype'] != 'describe' and node['ids'] and node['first']:
-            self.body.append('<!--[%s]-->' % node['ids'][0])
-
-    def depart_desc_signature(self, node):
-        """ Copy-paste from original method """
-        self.add_permalink_ref(node, _('Permalink to this definition'))
-        self.body.append('</div>')
-
-    def visit_desc_content(self, node):
-        """ Replace <dd> """
-        self.body.append(self.starttag(
-            node, 'div', '', style='margin-left: 40px;'))
-
-    def depart_desc_content(self, node):
-        self.body.append('</div>')
 
     def visit_table(self, node):
         """ Fix ugly table border
@@ -567,6 +539,7 @@ def setup(app):
     app.config.html_scaled_image_link = False
     if LooseVersion(sphinx.__version__) >= LooseVersion("1.4"):
         app.set_translator("html", HTMLConfluenceTranslator)
+        app.set_translator("json", HTMLConfluenceTranslator)
     else:
         app.config.html_translator_class = 'sphinx_confluence.HTMLConfluenceTranslator'
     app.config.html_add_permalinks = ''
