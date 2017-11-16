@@ -320,6 +320,8 @@ class HTMLConfluenceTranslator(HTMLTranslator):
         self.section_level -= 1
 
     def visit_reference(self, node):
+        from pprint import pprint
+        pprint(vars(node))
         atts = {'class': 'reference'}
         if node.get('internal') or 'refuri' not in node:
             atts['class'] += ' internal'
@@ -350,10 +352,29 @@ class HTMLConfluenceTranslator(HTMLTranslator):
         if 'reftitle' in node:
             atts['title'] = node['reftitle']
 
+        # if '_modules' in atts['href']:
+        #     parts = atts['href'].split('/')
+        #     _, __, *path = parts
+        #     path = '/'.join(path[:-1])
+        #     base = 'https://scm.biotech.ufl.edu/projects/ISS/repos/selfservice/browse/'
+        #     href = urljoin(base, path) + '.py'
+        #     if 'line' in node:
+        #         href += '#{}'.format(node['line'])
+        #     atts['href'] = href
+        if atts['href'].startswith("#"):
+            href = atts['href']
+            start = href.find('https:')
+            href = href[start:]
+            parts = href.split('/')
+
+            if len(parts) > 2 and "#" in parts[-2] and "#" in parts[-1]:
+                href = "/".join(parts[:-1])
+            atts['href'] = href
         self.body.append(self.starttag(node, 'a', '', **atts))
 
         if node.get('secnumber'):
             self.body.append(('%s' + self.secnumber_suffix) % '.'.join(map(str, node['secnumber'])))
+
 
 
     def visit_table(self, node):
