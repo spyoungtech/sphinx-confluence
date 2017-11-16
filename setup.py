@@ -10,7 +10,7 @@ setup(
     version='0.0.3',
     author='Arello Mobile',
     url='https://github.com/Arello-Mobile/sphinx-confluence',
-    packages=['sphinx_confluence'],
+    packages=['sphinx_confluence', 'sphinx_confluence.ext'],
     include_package_data=True,
     license='MIT',
     install_requires=open('requirements.txt').read(),
