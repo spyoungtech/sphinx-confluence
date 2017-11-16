@@ -42,9 +42,15 @@ First of all, after installation, you must enable this plugin in your [build con
 `conf.py` by adding `sphinx_confluence` into `extensions` list. This should looks like a:
 ```
 ...
-extensions = ['sphinx_confluence']
+extensions = ['sphinx_confluence',
+              'sphinx_confluence.ext.viewcode' # viewcode for bitbucket server
+              ]
+sphinx_confluence_repo_path = 'https://bitbucket.company.com/projects/KEY/repositories/my-repo/browse/' # if you want viewcode
+html_theme = 'sphinx_rtd_theme' # if you want to use the theme
 ...
 ```
+
+If you want to style your confluence space with a readthedocs-like theme, copy the CSS found in the confluence_stylesheet.css file to the confluence site or space look and feel seetings. **([space]settings -> look and feel -> stylesheet)**
 
 Then you can build you documentation into `html` or `json` formats, either by using [sphinx build command](http://www.sphinx-doc.org/en/stable/tutorial.html#running-the-build)
 or if you uses `sphinx-quickstart` script by following commands:
