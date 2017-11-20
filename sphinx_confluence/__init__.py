@@ -387,11 +387,9 @@ class HTMLConfluenceTranslator(HTMLTranslator):
                 elif 'reftitle' in node and node.get('reftitle'):
                     title = node.get('reftitle')
                     if title:
-                        print('Got anchor from title')
                         anchor = title.split('#')[-1]
 
                 if anchor:
-                    print(anchor)
                     self.body.append(anchor_macros % anchor)
 
                 self.body.append(anchor_macros % parts[-1][1:])
