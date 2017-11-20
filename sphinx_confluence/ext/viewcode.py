@@ -163,9 +163,7 @@ def collect_pages(app):
     if not hasattr(env, '_viewcode_modules'):
         return
     highlighter = app.builder.highlighter  # type: ignore
-    # urito = app.builder.get_relative_uri
-    def urito(from_, to, typ=None):
-        return app.builder.get_relative_uri(from_, to, typ=typ)
+    urito = app.builder.get_relative_uri
     modnames = set(env._viewcode_modules)  # type: ignore
 
 #    app.builder.info(' (%d module code pages)' %
