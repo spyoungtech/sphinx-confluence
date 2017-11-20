@@ -61,6 +61,7 @@ class JSONConfluenceBuilder(JSONHTMLBuilder):
 
 
 class HTMLConfluenceTranslator(HTMLTranslator):
+
     def unimplemented_visit(self, node):
         self.builder.warn('Unimplemented visit is not implemented for node: {}'.format(node))
 
@@ -150,7 +151,6 @@ class HTMLConfluenceTranslator(HTMLTranslator):
             # value=None was used for boolean attributes without
             # value, but this isn't supported by XHTML.
             assert value is not None
-
             if isinstance(value, list):
                 value = u' '.join(map(unicode, value))
             else:
@@ -234,6 +234,7 @@ class HTMLConfluenceTranslator(HTMLTranslator):
 
     def depart_target(self, node):
         pass
+
 
     def visit_literal_block(self, node):
         """
@@ -320,8 +321,12 @@ class HTMLConfluenceTranslator(HTMLTranslator):
         self.section_level -= 1
 
     def visit_reference(self, node):
-        # from pprint import pprint
-        # pprint(vars(node))
+        anchor_macros = """
+            <ac:structured-macro ac:name="anchor">
+              <ac:parameter ac:name="">%s</ac:parameter>
+            </ac:structured-macro>
+        """
+
         atts = {'class': 'reference'}
         if node.get('internal') or 'refuri' not in node:
             atts['class'] += ' internal'
@@ -346,30 +351,72 @@ class HTMLConfluenceTranslator(HTMLTranslator):
                 atts['href'] += '#%s-' % TitlesCache.get_title(self.document).replace(' ', '')
             atts['href'] += node['refid']
 
+
         if not isinstance(node.parent, nodes.TextElement):
             assert len(node) == 1 and isinstance(node[0], nodes.image)
             atts['class'] += ' image-reference'
         if 'reftitle' in node:
             atts['title'] = node['reftitle']
 
-        # if '_modules' in atts['href']:
-        #     parts = atts['href'].split('/')
-        #     _, __, *path = parts
-        #     path = '/'.join(path[:-1])
-        #     base = 'https://scm.biotech.ufl.edu/projects/ISS/repos/selfservice/browse/'
-        #     href = urljoin(base, path) + '.py'
-        #     if 'line' in node:
-        #         href += '#{}'.format(node['line'])
-        #     atts['href'] = href
+
         if atts['href'].startswith("#"):
+
             href = atts['href']
             start = href.find('https:')
             href = href[start:]
             parts = href.split('/')
 
-            if len(parts) > 2 and "#" in parts[-2] and "#" in parts[-1]:
+            if start >= 0 and len(parts) > 2 and "#" in parts[-2] and "#" in parts[-1]:
+                # if it's a bitbucket viewcode
+                anchor = None
                 href = "/".join(parts[:-1])
+                atts['href'] = href
+
+
+                if 'refuri' in node:
+                    uri = node.get('refuri')
+                    if uri:
+                        start = uri.find('/browse/') + 8
+                        uri = uri[start:]
+                        uri_parts = uri.split('/')
+                        uri_parts[-1] = uri_parts[-1].replace('#', '')
+                        uri_parts[-2] = uri_parts[-2][:uri_parts[-2].find('.py')]
+                        anchor = '.'.join(uri_parts)
+
+
+                elif 'reftitle' in node and node.get('reftitle'):
+                    title = node.get('reftitle')
+                    if title:
+                        print('Got anchor from title')
+                        anchor = title.split('#')[-1]
+
+                if anchor:
+                    print(anchor)
+                    self.body.append(anchor_macros % anchor)
+
+                self.body.append(anchor_macros % parts[-1][1:])
+
+
+        if "refpage" in node and not atts['href'].startswith('http'):
+            # Fix links for confluence pages
+            refpage = node.get('refpage')
+            target = None
+
+            if 'refuri' in node:
+                uri = node.get('refuri')
+                if uri:
+                    target = uri.split('/')[-1][1:]
+
+            if 'reftitle' in node:
+                if not target:
+                    title = node.get('reftitle')
+                    target = title.split('#')[-1]
+
+            href = refpage.get('server_path') + "#%s-" % refpage.get('short_title')
+            if target:
+                href += target
             atts['href'] = href
+
         self.body.append(self.starttag(node, 'a', '', **atts))
 
         if node.get('secnumber'):
@@ -551,10 +598,47 @@ def get_path():
     return template_path
 
 
+def find_page(pages, **params):
+    for page in pages:
+        if all(page.get(param) == value for param, value in params.items()):
+            return page
+    else:
+        raise ValueError('No such page')
+
+
+
+def fix_references(app, doctree, docname):
+    """
+    Injects 'refpage' attribute for nodes that have a confluence page
+    """
+    pages = app.config.sphinx_confluence_pages
+    for page in pages:
+        if page.get('local_path').endswith(docname):
+            break
+    else:
+        # If the page wasn't found skip the document
+        return
+
+    for node in doctree.traverse():
+        if hasattr(node, 'tagname') and node.tagname == 'reference':
+            if "refuri" in node:
+                uri = node.get('refuri')
+                if not uri.startswith('..') or 'http' in uri:
+                    return
+
+                parts = uri.split('/')
+                if len(parts) < 2:
+                    return
+                uri = '/'.join(part for part in parts if not part.startswith('#'))
+                docpath = os.path.abspath(os.path.join(page.get('local_path'), uri))
+                realpage = find_page(pages, local_path=docpath)
+                node['refpage'] = realpage
+
 def setup(app):
     """
     :type app: sphinx.application.Sphinx
     """
+    app.add_config_value('sphinx_confluence_pages', '', False)
     app.config.html_theme_path = [get_path()]
     app.config.html_theme = 'confluence'
     app.config.html_scaled_image_link = False
@@ -575,5 +659,7 @@ def setup(app):
     app.add_directive('toctree', TocTree)
     app.add_directive('jira_issues', JiraIssuesDirective)
     app.add_directive('code-block', CaptionedCodeBlock)
+    app.connect('doctree-resolved', fix_references)
+
 
     app.add_builder(JSONConfluenceBuilder)
