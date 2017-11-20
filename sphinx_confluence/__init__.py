@@ -20,6 +20,39 @@ from sphinx.locale import _
 from sphinx.writers.html import HTMLTranslator
 
 
+def setup_config(config_path, **authentication):
+    from yaml import load
+    from conf_publisher.confluence_api import create_confluence_api
+    from conf_publisher.constants import DEFAULT_CONFLUENCE_API_VERSION as version
+    from conf_publisher.auth import parse_authentication
+    with open(config_path) as f:
+        sc_config = load(f.read())
+
+    sphinx_confluence_url = sc_config.get('url')
+    session = parse_authentication(**authentication)
+    conf_api = create_confluence_api(version, sphinx_confluence_url, session)
+
+    def update_page(page_dict):
+        page_id = page_dict.get('id')
+        page_path = page_dict.get('source')
+        abspath = os.path.abspath(page_path)
+        page_info = conf_api.get_content(page_id)
+        page_path = page_info.get('_links').get('webui')
+        page_title = page_info.get('title')
+        page_short_title = page_title.replace(' ', '')
+        page_dict.update({'server_path': page_path,
+                          'title': page_title,
+                          'short_title': page_short_title,
+                          'local_path': abspath})
+        if 'pages' in page_dict:
+            for page in page_dict['pages']:
+                update_page(page)
+
+    for page in sc_config.get('pages'):
+        update_page(page)
+
+    return sc_config.get('pages')
+
 def true_false(argument):
     return directives.choice(argument, ('true', 'false'))
 
@@ -630,7 +663,8 @@ def fix_references(app, doctree, docname):
                 uri = '/'.join(part for part in parts if not part.startswith('#'))
                 docpath = os.path.abspath(os.path.join(page.get('local_path'), uri))
                 realpage = find_page(pages, local_path=docpath)
-                node['refpage'] = realpage
+                if realpage:
+                    node['refpage'] = realpage
 
 def setup(app):
     """
