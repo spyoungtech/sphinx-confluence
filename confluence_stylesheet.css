@@ -2599,3 +2599,8 @@ span[id*='MathJax-Span'] {
     }
     color: #404040
 }
+
+div.page code {
+    border: none;
+}
+
