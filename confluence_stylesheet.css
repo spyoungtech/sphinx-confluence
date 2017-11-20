@@ -2602,5 +2602,6 @@ span[id*='MathJax-Span'] {
 
 div.page code {
     border: none;
+    padding: 0;
 }
 
