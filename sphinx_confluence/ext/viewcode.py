@@ -22,6 +22,7 @@ from sphinx.pycode import ModuleAnalyzer
 from sphinx.util import logging, status_iterator#, get_full_modname
 from sphinx.util.nodes import make_refnode
 import sys
+
 if False:
     # For type annotation
     from typing import Any, Dict, Iterable, Iterator, Set, Tuple  # NOQA
@@ -123,26 +124,18 @@ def doctree_read(app, doctree):
                 # only one link per name, please
                 continue
             names.add(fullname)
-            # print(fullname)
-            # pagename = '_modules/' + modname.replace('.', '/')
             base_url = app.config.sphinx_confluence_repo_path
-            # print('base url: ', base_url)
             pagename = base_url + modname.replace('.', '/') + ".py#{}".format(line_no)
             onlynode = addnodes.only(expr='html')
-            def pending_xref(*args, **kwargs):
-                # print('xref args', kwargs)
 
-                result = addnodes.pending_xref(*args, **kwargs)
-                # print('xref-result:', result)
-                return result
-
-            onlynode += pending_xref(
+            onlynode += addnodes.pending_xref(
                 '', reftype='viewcode', refdomain='std', refexplicit=False,
                 reftarget=pagename, refid=fullname,
                 refdoc=env.docname)
             onlynode[0] += nodes.inline('', _('[source]'),
                                         classes=['viewcode-link'])
             signode += onlynode
+
 
 
 def env_merge_info(app, env, docnames, other):
@@ -170,13 +163,7 @@ def collect_pages(app):
     if not hasattr(env, '_viewcode_modules'):
         return
     highlighter = app.builder.highlighter  # type: ignore
-    # urito = app.builder.get_relative_uri
-    def urito(from_, to, typ=None):
-        print('urito')
-        print(to)
-        print(typ)
-        print('--')
-        return app.builder.get_relative_uri(from_, to, typ=typ)
+    urito = app.builder.get_relative_uri
     modnames = set(env._viewcode_modules)  # type: ignore
 
 #    app.builder.info(' (%d module code pages)' %
@@ -211,7 +198,6 @@ def collect_pages(app):
         for name, docname in iteritems(used):
             type, start, end = tags[name]
             backlink = urito(pagename, docname) + '#' + refname + '.' + name
-            print('backlink', backlink)
             lines[start] = (
                 '<div class="viewcode-block" id="%s"><a class="viewcode-back" '
                 'href="%s">%s</a>' % (name, backlink, _('[docs]')) +
@@ -258,7 +244,6 @@ def collect_pages(app):
         link = '<li><a href="%s">%s</a></li>\n' % (
             urito('_modules/index', '_modules/' + modname.replace('.', '/')),
             modname)
-        print('link', link)
         html.append(link)
     html.append('</ul>' * (len(stack) - 1))
     context = {
@@ -268,6 +253,7 @@ def collect_pages(app):
     }
 
     yield ('_modules/index', context, 'page.html')
+
 
 
 def setup(app):
