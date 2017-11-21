@@ -1,103 +1,83 @@
+## This Fork
 
-# Sphinx Confluence Plugin
+This fork combines the [upstream project](https://github.com/Arello-Mobile/sphinx-confluence) along with the functionality of the complement [confluence-publisher](https://github.com/Arello-Mobile/confluence-publisher) project. This fork also makes some notable changes:
 
-[![Build Status](https://travis-ci.org/Arello-Mobile/sphinx-confluence.svg?branch=master)](https://travis-ci.org/Arello-Mobile/sphinx-confluence)
+- Automatic publishing on a successful build is supported (use `sphinx_confluence_publish = True`)
+- Is designed to use the style of the popular readthedocs theme (and supplies an accompanying CSS file to put in your Confluence space)
+- Supports cross-references between documents
+- Supplies a viewcode extension compatible with Bitbucket Server (not Cloud)
 
-Sphinx extension for making the documentation compatible with the [Confluence Storage Format](https://confluence.atlassian.com/display/DOC/Confluence+Storage+Format).
 
-Features:
+Sample confluence page
 
-- base HTML elements
-- images (image, figure)
-- code blocks (::) and includes (literalinclude)
-- referencing downloadable files (:download:)
-- the TOC tree (.. toctree::)
-- internal links (:ref: `<label>`; .. _<label>)
-- Inline and table Jira Issues
-- Reference for Confluence User
-- Info, Tip, Note, and Warning Macros
+![Sample Page](https://i.imgur.com/2BeawdD.png)
 
-## Why?
+If you have the viewcode extension configured with a bitbucket server repository, the `[source]` link should take you right to the line where it's defined.
 
-This extension is written as part of our Documentation Toolkit which we use in our job daily.
-The main idea of toolkit is to make a process of creating and updating documentation able to be automated
+![Bitbucket Viewcode](https://i.imgur.com/TAXEcMY.png)
 
-Other parts of our toolkit is:
+Note: to use publishing features you should install confluence-publisher from github, not PyPI
 
-- [py2swagger](https://github.com/Arello-Mobile/py2swagger)
-- [swagger2rst](https://github.com/Arello-Mobile/swagger2rst)
-- [sphinx-confluence](https://github.com/Arello-Mobile/sphinx-confluence)
-- [confluence-publisher](https://github.com/Arello-Mobile/confluence-publisher)
-
-# Install
-
-Install Sphinx Confluence Plugin from [PyPI](https://pypi.python.org/pypi/sphinx-confluence) with
 ```
-$ pip install sphinx-confluence
+$ pip install git+https://github.com/Arello-Mobile/confluence-publisher.git
 ```
+
+Currently, the confluence-publisher code is not included in this repo and there is no companion fork, either, since no modifications to that code have been necessary. Updates to this upstream repository may break compatibility with this code. If this happens, please submit an issue.
+
+This has been successfully used with Confluence 6.2 and Bitbucket Server 5.2 -- Other versions will probably work fine, but are untested.
+
+## Known issues and Limitations
+
+Some known limitations for the moment are:
+
+- Module reference anchors do not work; links will take you to an appropriate page, but not to the location on the page.
+- Will probably only work if your documentation is in the root of the repository.
+- Requires that document names are unique.
+- The Viewcode extension will only work on `https` bitbucket-server repositories. Depends on `/browse/` being in the URL.
+- Only the standard confluence codeblock theme is supported. Some other themes wind up looking... odd.
+- Connecting to the Confluence API is necessary for every build in order for cross-references to work. In the future, updates to the `config.yml` through augmenting `conf_page_maker` may eliminate this need (so long as the page location does not change)
+- Uses `inspect` to get code line numbers. This can be slow/problematic for very large projects.
+- Overall, implemented with hacks and, for now, is fairly fragile.
 
 ## How use it
+
+
+Install from github.
+
+```
+pip install git+https://github.com/spyoungtech/sphinx-confluence.git
+```
 
 First of all, after installation, you must enable this plugin in your [build configuration file](http://www.sphinx-doc.org/en/stable/config.html#confval-extensions)
 `conf.py` by adding `sphinx_confluence` into `extensions` list. This should looks like a:
 ```
 ...
-extensions = ['sphinx_confluence']
+extensions = ['sphinx_confluence',
+              'sphinx_confluence.ext.viewcode' # viewcode for bitbucket server
+              ]
+sphinx_confluence_repo_path = 'https://bitbucket.company.com/projects/KEY/repositories/my-repository/browse/' # if you want viewcode
+html_theme = 'sphinx_rtd_theme' # if you want to use the theme
 ...
 ```
 
-Then you can build you documentation into `html` or `json` formats, either by using [sphinx build command](http://www.sphinx-doc.org/en/stable/tutorial.html#running-the-build)
-or if you uses `sphinx-quickstart` script by following commands:
-- `make html`
-- `make singlehtml`
-- `make json`
+If you want to use the rtd theme in your space (recommended) you should add the `confluence_stylesheet.css` to your space's stylesheet.
 
-After that, the results must be in Confluence Storage Format. You can use [confluence-publisher](https://github.com/Arello-Mobile/confluence-publisher)
-for publish them to your Confluence.
+If you want to support multi-page cross-references, add the following code to your conf.py
 
-
-## Additional Markup Constructs
-
-Sphinx Confluence Plugin adds few new directives to standard reST markup.
-
-### Jira Issues
-
-**Inline**
-
-```rst
-Lorem ipsum dolor sit amet, :jira_issue:`PROJECT-123` consectetur adipiscing elit
+```python
+from sphinx_confluence import setup_config
+sphinx_confluence_pages = setup_config(config_path='/path/to/config.yml', user='myusername')
 ```
 
-**Table View**
+If you want to publish when the build completes you can add the following config values
 
-*Markup:*
-
-```rst
-.. jira_issues:: <JQL query>
-   :anonymous: 'true'|'false' (default: 'false')
-   :server_id: 'string' (default: '')
-   :baseurl: 'string' (default: '')
-   :columns: A list of JIRA column names, separated by semi-colons (;)
-   :count: 'true'|'false' (default: 'false')
-   :height: int (default: 480)
-   :title: 'string' (default: '')
-   :render_mode: 'static'|'dynamic' (default: 'static')
-   :url: 'string' (default: '')
-   :width: '{x}px' | '{x}%' (default: '100%')
-   :maximum_issues: int (default: 20)
+```python
+sphinx_confluence_publish = True
+sphinx_confluence_publish_options = {'auth': {'user': 'myusername'}}
 ```
 
-*Example:*
 
-```rst
-.. jira_issues:: project = PROJ AND issuetype = Epic AND resolution = Unresolved
-   :title: Unresolved project epics
-   :columns: type;key;summary;status;created;
-   :width: 80%
-```
+Multi-page support and publishing requires that you have [confluence-publisher](https://github.com/Arello-Mobile/confluence-publisher)  installed and a valid `config.yml`.
 
-### Jira Users
 
-```rst
-Lorem ipsum dolor sit amet, :jira_user:`username` consectetur adipiscing elit
-```
+

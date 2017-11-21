@@ -20,6 +20,39 @@ from sphinx.locale import _
 from sphinx.writers.html import HTMLTranslator
 
 
+def setup_config(config_path, **authentication):
+    from yaml import load
+    from conf_publisher.confluence_api import create_confluence_api
+    from conf_publisher.constants import DEFAULT_CONFLUENCE_API_VERSION as version
+    from conf_publisher.auth import parse_authentication
+    with open(config_path) as f:
+        sc_config = load(f.read())
+
+    sphinx_confluence_url = sc_config.get('url')
+    session = parse_authentication(**authentication)
+    conf_api = create_confluence_api(version, sphinx_confluence_url, session)
+
+    def update_page(page_dict):
+        page_id = page_dict.get('id')
+        page_path = page_dict.get('source')
+        abspath = os.path.abspath(page_path)
+        page_info = conf_api.get_content(page_id)
+        page_path = page_info.get('_links').get('webui')
+        page_title = page_info.get('title')
+        page_short_title = page_title.replace(' ', '')
+        page_dict.update({'server_path': page_path,
+                          'title': page_title,
+                          'short_title': page_short_title,
+                          'local_path': abspath})
+        if 'pages' in page_dict:
+            for page in page_dict['pages']:
+                update_page(page)
+
+    for page in sc_config.get('pages'):
+        update_page(page)
+
+    return sc_config.get('pages')
+
 def true_false(argument):
     return directives.choice(argument, ('true', 'false'))
 
@@ -61,6 +94,7 @@ class JSONConfluenceBuilder(JSONHTMLBuilder):
 
 
 class HTMLConfluenceTranslator(HTMLTranslator):
+
     def unimplemented_visit(self, node):
         self.builder.warn('Unimplemented visit is not implemented for node: {}'.format(node))
 
@@ -150,7 +184,6 @@ class HTMLConfluenceTranslator(HTMLTranslator):
             # value=None was used for boolean attributes without
             # value, but this isn't supported by XHTML.
             assert value is not None
-
             if isinstance(value, list):
                 value = u' '.join(map(unicode, value))
             else:
@@ -234,6 +267,7 @@ class HTMLConfluenceTranslator(HTMLTranslator):
 
     def depart_target(self, node):
         pass
+
 
     def visit_literal_block(self, node):
         """
@@ -320,6 +354,12 @@ class HTMLConfluenceTranslator(HTMLTranslator):
         self.section_level -= 1
 
     def visit_reference(self, node):
+        anchor_macros = """
+            <ac:structured-macro ac:name="anchor">
+              <ac:parameter ac:name="">%s</ac:parameter>
+            </ac:structured-macro>
+        """
+
         atts = {'class': 'reference'}
         if node.get('internal') or 'refuri' not in node:
             atts['class'] += ' internal'
@@ -344,45 +384,76 @@ class HTMLConfluenceTranslator(HTMLTranslator):
                 atts['href'] += '#%s-' % TitlesCache.get_title(self.document).replace(' ', '')
             atts['href'] += node['refid']
 
+
         if not isinstance(node.parent, nodes.TextElement):
             assert len(node) == 1 and isinstance(node[0], nodes.image)
             atts['class'] += ' image-reference'
         if 'reftitle' in node:
             atts['title'] = node['reftitle']
 
+
+        if atts['href'].startswith("#"):
+
+            href = atts['href']
+            start = href.find('https:')
+            href = href[start:]
+            parts = href.split('/')
+
+            if start >= 0 and len(parts) > 2 and "#" in parts[-2] and "#" in parts[-1]:
+                # if it's a bitbucket viewcode
+                anchor = None
+                href = "/".join(parts[:-1])
+                atts['href'] = href
+
+
+                if 'refuri' in node:
+                    uri = node.get('refuri')
+                    if uri:
+                        start = uri.find('/browse/') + 8
+                        uri = uri[start:]
+                        uri_parts = uri.split('/')
+                        uri_parts[-1] = uri_parts[-1].replace('#', '')
+                        uri_parts[-2] = uri_parts[-2][:uri_parts[-2].find('.py')]
+                        anchor = '.'.join(uri_parts)
+
+
+                elif 'reftitle' in node and node.get('reftitle'):
+                    title = node.get('reftitle')
+                    if title:
+                        anchor = title.split('#')[-1]
+
+                if anchor:
+                    self.body.append(anchor_macros % anchor)
+
+                self.body.append(anchor_macros % parts[-1][1:])
+
+
+        if "refpage" in node and not atts['href'].startswith('http'):
+            # Fix links for confluence pages
+            refpage = node.get('refpage')
+            target = None
+
+            if 'refuri' in node:
+                uri = node.get('refuri')
+                if uri:
+                    target = uri.split('/')[-1][1:]
+
+            if 'reftitle' in node:
+                if not target:
+                    title = node.get('reftitle')
+                    target = title.split('#')[-1]
+
+            href = refpage.get('server_path') + "#%s-" % refpage.get('short_title')
+            if target:
+                href += target
+            atts['href'] = href
+
         self.body.append(self.starttag(node, 'a', '', **atts))
 
         if node.get('secnumber'):
             self.body.append(('%s' + self.secnumber_suffix) % '.'.join(map(str, node['secnumber'])))
 
-    def visit_desc(self, node):
-        """ Replace <dl> """
-        self.body.append(self.starttag(node, 'div', style="margin-top: 10px"))
 
-    def depart_desc(self, node):
-        self.body.append('</div>\n\n')
-
-    def visit_desc_signature(self, node):
-        """ Replace <dt> """
-        # the id is set automatically
-        self.body.append(self.starttag(
-            node, 'div', style='margin-left: 20px; font-weight: bold;'))
-        # anchor for per-desc interactive data
-        if node.parent['objtype'] != 'describe' and node['ids'] and node['first']:
-            self.body.append('<!--[%s]-->' % node['ids'][0])
-
-    def depart_desc_signature(self, node):
-        """ Copy-paste from original method """
-        self.add_permalink_ref(node, _('Permalink to this definition'))
-        self.body.append('</div>')
-
-    def visit_desc_content(self, node):
-        """ Replace <dd> """
-        self.body.append(self.starttag(
-            node, 'div', '', style='margin-left: 40px;'))
-
-    def depart_desc_content(self, node):
-        self.body.append('</div>')
 
     def visit_table(self, node):
         """ Fix ugly table border
@@ -558,15 +629,54 @@ def get_path():
     return template_path
 
 
+def find_page(pages, **params):
+    for page in pages:
+        if all(page.get(param) == value for param, value in params.items()):
+            return page
+    else:
+        raise ValueError('No such page')
+
+
+
+def fix_references(app, doctree, docname):
+    """
+    Injects 'refpage' attribute for nodes that have a confluence page
+    """
+    pages = app.config.sphinx_confluence_pages
+    for page in pages:
+        if page.get('local_path').endswith(docname):
+            break
+    else:
+        # If the page wasn't found skip the document
+        return
+
+    for node in doctree.traverse():
+        if hasattr(node, 'tagname') and node.tagname == 'reference':
+            if "refuri" in node:
+                uri = node.get('refuri')
+                if not uri.startswith('..') or 'http' in uri:
+                    return
+
+                parts = uri.split('/')
+                if len(parts) < 2:
+                    return
+                uri = '/'.join(part for part in parts if not part.startswith('#'))
+                docpath = os.path.abspath(os.path.join(page.get('local_path'), uri))
+                realpage = find_page(pages, local_path=docpath)
+                if realpage:
+                    node['refpage'] = realpage
+
 def setup(app):
     """
     :type app: sphinx.application.Sphinx
     """
+    app.add_config_value('sphinx_confluence_pages', '', False)
     app.config.html_theme_path = [get_path()]
     app.config.html_theme = 'confluence'
     app.config.html_scaled_image_link = False
     if LooseVersion(sphinx.__version__) >= LooseVersion("1.4"):
         app.set_translator("html", HTMLConfluenceTranslator)
+        app.set_translator("json", HTMLConfluenceTranslator)
     else:
         app.config.html_translator_class = 'sphinx_confluence.HTMLConfluenceTranslator'
     app.config.html_add_permalinks = ''
@@ -581,5 +691,7 @@ def setup(app):
     app.add_directive('toctree', TocTree)
     app.add_directive('jira_issues', JiraIssuesDirective)
     app.add_directive('code-block', CaptionedCodeBlock)
+    app.connect('doctree-resolved', fix_references)
+
 
     app.add_builder(JSONConfluenceBuilder)
