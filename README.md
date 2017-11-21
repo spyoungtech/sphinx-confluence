@@ -8,9 +8,9 @@ This fork combines the [upstream project](https://github.com/Arello-Mobile/sphin
 - Supplies a viewcode extension compatible with Bitbucket Server (not Cloud)
 
 
-Sample confluence page
+Sample confluence page ([Sample .rst content](https://raw.githubusercontent.com/brandon-rhodes/sphinx-tutorial/master/handout/api.rst) from Brandon Rhodes [sphinx-tutorial](https://github.com/brandon-rhodes/sphinx-tutorial). Thanks Brandon!)
 
-![Sample Page](https://i.imgur.com/2BeawdD.png)
+![Sample Page](https://i.imgur.com/7PkZz0k.png)
 
 If you have the viewcode extension configured with a bitbucket server repository, the `[source]` link should take you right to the line where it's defined.
 
