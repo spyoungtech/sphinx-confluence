@@ -18,7 +18,9 @@ from sphinx.builders.html import JSONHTMLBuilder
 from sphinx.directives.code import CodeBlock
 from sphinx.locale import _
 from sphinx.writers.html import HTMLTranslator
+import logging
 
+logger = logging.getLogger(__name__)
 
 def setup_config(config_path, **authentication):
     from yaml import load
@@ -634,20 +636,17 @@ def find_page(pages, **params):
         if all(page.get(param) == value for param, value in params.items()):
             return page
     else:
-        raise ValueError('No such page')
+        return None
 
 
 
 def fix_references(app, doctree, docname):
-    """
-    Injects 'refpage' attribute for nodes that have a confluence page
-    """
     pages = app.config.sphinx_confluence_pages
     for page in pages:
         if page.get('local_path').endswith(docname):
             break
     else:
-        # If the page wasn't found skip the document
+        logger.debug('Didn\'t find confluence page for %s', docname)
         return
 
     for node in doctree.traverse():
@@ -655,22 +654,52 @@ def fix_references(app, doctree, docname):
             if "refuri" in node:
                 uri = node.get('refuri')
                 if not uri.startswith('..') or 'http' in uri:
-                    return
+                    continue
 
                 parts = uri.split('/')
                 if len(parts) < 2:
-                    return
+                    continue
                 uri = '/'.join(part for part in parts if not part.startswith('#'))
                 docpath = os.path.abspath(os.path.join(page.get('local_path'), uri))
                 realpage = find_page(pages, local_path=docpath)
                 if realpage:
+                    logger.debug('Confluence page \'%s\' found for reference node with uri %s', realpage.get('title'), uri)
                     node['refpage'] = realpage
+
+
+def publish_main(app, exception):
+    if exception is not None:
+        return
+
+    if app.config.sphinx_confluence_publish is False:
+        return
+    try:
+        from conf_publisher.publish import DEFAULT_CONFLUENCE_API_VERSION, create_publisher, create_confluence_api, parse_authentication, ConfigLoader
+    except ImportError:
+        raise ImportError("Could not import from conf_publisher. Is confluence-publisher installed?")
+
+    publish_options = app.config.sphinx_confluence_publish_options
+    auth_options = publish_options.pop('auth')
+    auth = parse_authentication(**auth_options)
+    config = ConfigLoader.from_yaml(app.config.sphinx_confluence_config_path)
+
+    confluence_api = create_confluence_api(DEFAULT_CONFLUENCE_API_VERSION, config.url, auth)
+    publisher = create_publisher(config, confluence_api)
+    print('Publishing...')
+    publisher.publish(**publish_options)
+
 
 def setup(app):
     """
     :type app: sphinx.application.Sphinx
     """
-    app.add_config_value('sphinx_confluence_pages', '', False)
+    watermark_default = 'This documentation was generated automatically. Do not edit directly, changes will be overwritten'
+    app.add_config_value('sphinx_confluence_pages', list(), False)
+    app.add_config_value('sphinx_confluence_publish', False, False)
+    app.add_config_value('sphinx_confluence_config_path', 'config.yml', False)
+    app.add_config_value('sphinx_confluence_publish_options', dict(), False)
+
+
     app.config.html_theme_path = [get_path()]
     app.config.html_theme = 'confluence'
     app.config.html_scaled_image_link = False
@@ -692,6 +721,10 @@ def setup(app):
     app.add_directive('jira_issues', JiraIssuesDirective)
     app.add_directive('code-block', CaptionedCodeBlock)
     app.connect('doctree-resolved', fix_references)
+    app.connect('build-finished', publish_main)
 
 
     app.add_builder(JSONConfluenceBuilder)
+
+if __name__ == '__main__':
+    publish_main()
