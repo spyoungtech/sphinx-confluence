@@ -10,12 +10,12 @@ This fork makes some notable changes from its [upstream counterpart](https://git
 - Supplies a viewcode extension compatible with Bitbucket Server (not Cloud)
 - Is designed to use the style of the popular [sphinx Read The Docs theme](https://github.com/rtfd/sphinx_rtd_theme) (and supplies an accompanying CSS file to put in your Confluence space)
 - Automatic publishing on a successful build is supported (use `sphinx_confluence_publish = True`, requires confluence-publisher)
-
+- Supplies additional directives for confluence macros
 
 To support some of these features, the [confluence-publisher](https://github.com/Arello-Mobile/confluence-publisher) project is utilized directly. Therefore, you must install and configure this package as well to use features as documented.
 
 
-This has been successfully used with Confluence Server 6.2 and Bitbucket Server 5.2 -- Other versions will probably work fine, but are untested.
+This has been successfully used with Confluence Server 6.2+ (tested up to 6.7) and Bitbucket Server 5.2 -- Other versions will probably work fine, but are untested.
 
 
 ## How use it
@@ -112,7 +112,9 @@ sphinx_confluence_publish_options = {'auth': {'user': 'myusername'}}
 
 Multi-page support and publishing requires that you have [confluence-publisher](https://github.com/Arello-Mobile/confluence-publisher)  installed and a valid `config.yml`.
 
-## Example
+
+
+## ViewCode Example
 
 The following is a sample confluence page created with this package. ([Sample .rst content](https://raw.githubusercontent.com/brandon-rhodes/sphinx-tutorial/master/handout/api.rst) from Brandon Rhodes [sphinx-tutorial](https://github.com/brandon-rhodes/sphinx-tutorial). Thanks Brandon!)
 
@@ -122,17 +124,61 @@ This utilizes the viewcode extension configured with a bitbucket server reposito
 
 ![Bitbucket Viewcode](https://i.imgur.com/TAXEcMY.png)
 
+
+## Macros
+
+### Emoticons
+
+Emoticons can be added with the `emote` directive. Use the name of the emoticon and the markup will produce the emoticon 
+in confluence storage format. You can find some of the names [here](https://confluence.atlassian.com/doc/confluence-storage-format-790796544.html) 
+A nice way to do this is using substitutions. Here are some brief examples...
+
+In the future we hope to provide a way to do this without needing to provide the directive substitutions yourself.
+
+```
+A table of emotes:
+
+===============   =========
+Name              symbol
+===============   =========
+smile             |smile|
+sad               |sad|
+cheeky            |cheeky|
+laugh             |laugh|
+wink              |wink|
+thumbs-up         |thumbs-up|
+thumbs-down       |thumbs-down|
+information       |information|
+tick              |tick|
+cross             |cross|
+warning           |warning|
+question          |question|
+
+===============   =========
+
+.. |smile| emote:: smile
+.. |sad| emote:: sad
+.. |cheeky| emote:: cheeky
+.. |laugh| emote:: laugh
+.. |wink| emote:: wink
+.. |thumbs-up| emote:: thumbs-up
+.. |thumbs-down| emote:: thumbs-down
+.. |information| emote:: information
+.. |tick| emote:: tick
+.. |cross| emote:: cross
+.. |warning| emote:: warning
+.. |question| emote:: question
+
+```
+
 ## Known issues and Limitations
 
 Some known limitations for the moment are:
 
-- Module reference anchors do not work; links will take you to an appropriate page, but not to the location on the page.
-- Will probably only work if your documentation is in the root of the repository.
-- Requires that document names are unique.
+- Requires that document filenames are unique.
 - The Viewcode extension will only work on `https` bitbucket-server repositories.
 - Only the standard confluence codeblock theme is supported. Some other themes wind up looking... odd.
 - Connecting to the Confluence API is necessary for every build in order for cross-references to work. In the future, updates to the `config.yml` through augmenting `conf_page_maker` may eliminate this need (so long as the page location does not change)
-- Uses `inspect` to get code line numbers. This can be slow/problematic for very large projects.
-- Overall, implemented with hacks and, for now, is fairly fragile.
+- Overall, the viewcode implementation is fragile.
 
 Please open an issue if you have any problems using this package or want to see improvements.
