@@ -456,7 +456,6 @@ class HTMLConfluenceTranslator(HTMLTranslator):
             self.body.append(('%s' + self.secnumber_suffix) % '.'.join(map(str, node['secnumber'])))
 
 
-
     def visit_table(self, node):
         """ Fix ugly table border
         """
@@ -584,7 +583,6 @@ class JiraIssuesDirective(Directive):
 
 
 class JiraIssueRole(roles.GenericRole):
-
     def __call__(self, role, rawtext, text, *args, **kwargs):
         macro = """\
           <ac:structured-macro ac:name="jira" ac:schema-version="1">
@@ -607,6 +605,7 @@ class JiraUserRole(roles.GenericRole):
         return [nodes.raw('', macro.format(username=text), **attributes)], []
 
 
+
 class CaptionedCodeBlock(CodeBlock):
 
     def run(self):
@@ -619,6 +618,15 @@ class CaptionedCodeBlock(CodeBlock):
                 return [container_node[1]]
         return ret
 
+
+class EmoteDirective(Directive):
+    required_arguments = 1
+    def run(self):
+        macro = """<ac:emoticon ac:name="{name}" />"""
+        attributes = {'format': 'html'}
+        name = self.arguments[0]
+        raw_node = nodes.raw('', macro.format(name=name), **attributes)
+        return [raw_node]
 
 def underscore_to_camelcase(text):
     return ''.join(word.title() if i else word for i, word in enumerate(text.split('_')))
@@ -720,6 +728,7 @@ def setup(app):
     app.add_directive('toctree', TocTree)
     app.add_directive('jira_issues', JiraIssuesDirective)
     app.add_directive('code-block', CaptionedCodeBlock)
+    app.add_directive('emote', EmoteDirective)
     app.connect('doctree-resolved', fix_references)
     app.connect('build-finished', publish_main)
 
