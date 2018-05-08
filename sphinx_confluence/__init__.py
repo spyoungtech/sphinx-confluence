@@ -19,6 +19,7 @@ from sphinx.directives.code import CodeBlock
 from sphinx.locale import _
 from sphinx.writers.html import HTMLTranslator
 import logging
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ def setup_config(config_path, **authentication):
         sc_config = load(f.read())
 
     sphinx_confluence_url = sc_config.get('url')
+    confluence_path = urlparse(sphinx_confluence_url).path
     session = parse_authentication(**authentication)
     conf_api = create_confluence_api(version, sphinx_confluence_url, session)
 
@@ -42,7 +44,7 @@ def setup_config(config_path, **authentication):
         page_path = page_info.get('_links').get('webui')
         page_title = page_info.get('title')
         page_short_title = page_title.replace(' ', '')
-        page_dict.update({'server_path': page_path,
+        page_dict.update({'server_path': confluence_path + page_path,
                           'title': page_title,
                           'short_title': page_short_title,
                           'local_path': abspath})
@@ -661,14 +663,13 @@ def fix_references(app, doctree, docname):
         if hasattr(node, 'tagname') and node.tagname == 'reference':
             if "refuri" in node:
                 uri = node.get('refuri')
-                if not uri.startswith('..') or 'http' in uri:
+                if 'http' in uri:
                     continue
-
                 parts = uri.split('/')
                 if len(parts) < 2:
                     continue
-                uri = '/'.join(part for part in parts if not part.startswith('#'))
-                docpath = os.path.abspath(os.path.join(page.get('local_path'), uri))
+                clean_uri = '/'.join(part for part in parts if not part.startswith('#'))
+                docpath = os.path.abspath(clean_uri)
                 realpage = find_page(pages, local_path=docpath)
                 if realpage:
                     logger.debug('Confluence page \'%s\' found for reference node with uri %s', realpage.get('title'), uri)
